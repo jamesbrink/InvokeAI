@@ -1,91 +1,109 @@
-# Important note: this flake does not attempt to create a fully isolated, 'pure'
-# Python environment for InvokeAI. Instead, it depends on local invocations of
-# virtualenv/pip to install the required (binary) packages, most importantly the
-# prebuilt binary pytorch packages with CUDA support.
-# ML Python packages with CUDA support, like pytorch, are notoriously expensive
-# to compile so it's purposefuly not what this flake does.
-
 {
-  description = "An (impure) flake to develop on InvokeAI.";
+  description = "InvokeAI - A full-featured AI-assisted image generation environment";
 
-  outputs = { self, nixpkgs }:
-    let
-      system = "x86_64-linux";
-      pkgs = import nixpkgs {
-        inherit system;
-        config.allowUnfree = true;
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+    devshell.url = "github:numtide/devshell";
+    devshell.inputs.nixpkgs.follows = "nixpkgs";
+    treefmt-nix.url = "github:numtide/treefmt-nix";
+    treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
+  };
+
+  outputs =
+    inputs:
+    inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+      imports = [
+        inputs.devshell.flakeModule
+        inputs.treefmt-nix.flakeModule
+        ./nix/devshell.nix
+      ];
+
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "x86_64-darwin"
+        "aarch64-darwin"
+      ];
+
+      # Non-per-system outputs: overlay and service modules
+      flake = {
+        overlays.default = import ./nix/overlay.nix;
+        nixosModules.default = import ./nix/modules/nixos.nix;
+        darwinModules.default = import ./nix/modules/darwin.nix;
       };
 
-      python = pkgs.python310;
-
-      mkShell = { dir, install }:
+      perSystem =
+        { lib, system, ... }:
         let
-          setupScript = pkgs.writeScript "setup-invokai" ''
-            # This must be sourced using 'source', not executed.
-            ${python}/bin/python -m venv ${dir}
-            ${dir}/bin/python -m pip install ${install}
-            # ${dir}/bin/python -c 'import torch; assert(torch.cuda.is_available())'
-            source ${dir}/bin/activate
-          '';
+          pkgs = import inputs.nixpkgs {
+            inherit system;
+            config = {
+              allowUnfree = true;
+            };
+          };
+
+          isDarwin = pkgs.stdenv.isDarwin;
+          isLinux = pkgs.stdenv.isLinux;
+
+          python3 = pkgs.python312.override {
+            packageOverrides = import ./nix/python-packages.nix {
+              inherit pkgs lib;
+            };
+          };
+
+          invokeai = pkgs.callPackage ./nix/invokeai.nix {
+            inherit python3;
+          };
+
+          docker-image = pkgs.callPackage ./nix/docker-image.nix {
+            inherit invokeai;
+          };
         in
-        pkgs.mkShell rec {
-          buildInputs = with pkgs; [
-            # Backend: graphics, CUDA.
-            cudaPackages.cudnn
-            cudaPackages.cuda_nvrtc
-            cudatoolkit
-            pkg-config
-            libconfig
-            cmake
-            blas
-            freeglut
-            glib
-            gperf
-            procps
-            libGL
-            libGLU
-            linuxPackages.nvidia_x11
-            python
-            (opencv4.override {
-              enableGtk3 = true;
-              enableFfmpeg = true;
-              enableCuda = true;
-              enableUnfree = true;
-            })
-            stdenv.cc
-            stdenv.cc.cc.lib
-            xorg.libX11
-            xorg.libXext
-            xorg.libXi
-            xorg.libXmu
-            xorg.libXrandr
-            xorg.libXv
-            zlib
+        {
+          # Override the default pkgs so all perSystem modules (including devshell)
+          # get nixpkgs with allowUnfree = true (required for CUDA on Linux).
+          _module.args.pkgs = pkgs;
 
-            # Pre-commit hooks.
-            black
+          # treefmt — provides `nix fmt` and `checks.treefmt`
+          treefmt = {
+            projectRootFile = "flake.nix";
+            programs = {
+              nixfmt.enable = true;
+              ruff = {
+                enable = true;
+                format = true;
+              };
+              prettier = {
+                enable = true;
+                includes = [ "invokeai/frontend/web/**/*.{ts,tsx,js,jsx,css,json}" ];
+                excludes = [
+                  "invokeai/frontend/web/node_modules/**"
+                  "invokeai/frontend/web/dist/**"
+                ];
+              };
+            };
+          };
 
-            # Frontend.
-            pnpm_8
-            nodejs
-          ];
-          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath buildInputs;
-          CUDA_PATH = pkgs.cudatoolkit;
-          EXTRA_LDFLAGS = "-L${pkgs.linuxPackages.nvidia_x11}/lib";
-          shellHook = ''
-            if [[ -f "${dir}/bin/activate" ]]; then
-              source "${dir}/bin/activate"
-              echo "Using Python: $(which python)"
-            else
-              echo "Use 'source ${setupScript}' to set up the environment."
-            fi
-          '';
+          # nix build / nix build .#default
+          packages = {
+            default = invokeai;
+            invokeai = invokeai;
+          }
+          // lib.optionalAttrs isLinux {
+            docker = docker-image;
+          };
+
+          # nix run / nix run .#default
+          apps = {
+            default = {
+              type = "app";
+              program = "${invokeai}/bin/invokeai-web";
+              meta.description = "Start the InvokeAI web interface";
+            };
+          };
+
+          # nix develop — provided by ./nix/devshell.nix
         };
-    in
-    {
-      devShells.${system} = rec {
-        develop = mkShell { dir = "venv"; install = "-e '.[xformers]' --extra-index-url https://download.pytorch.org/whl/cu118"; };
-        default = develop;
-      };
     };
 }

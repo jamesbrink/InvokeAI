@@ -193,5 +193,9 @@ installer/InvokeAI-Installer/
 
 .claude/
 
+# Nix
+.direnv/
+result
+
 # Weblate configuration file
 weblate.ini
