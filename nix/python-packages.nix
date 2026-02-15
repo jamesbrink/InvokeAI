@@ -359,6 +359,20 @@ self: super:
 
   # === Version-pinned overrides ===
 
+  # InvokeAI requires fastapi 0.118.3 — 0.119.0+ breaks OpenAPI schema for AnyInvocation
+  fastapi = super.fastapi.overridePythonAttrs (old: {
+    version = "0.118.3";
+    src = pkgs.fetchFromGitHub {
+      owner = "fastapi";
+      repo = "fastapi";
+      rev = "0.118.3";
+      hash = "sha256-MAuxbakxXfpT2+o5xGH5E38Nz44hel2WE+35UDpwlAs=";
+    };
+    nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ self.pythonRelaxDepsHook ];
+    pythonRelaxDeps = true;
+    doCheck = false;
+  });
+
   # InvokeAI requires diffusers 0.36.0
   diffusers = super.diffusers.overridePythonAttrs (old: {
     version = "0.36.0";

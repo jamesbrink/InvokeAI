@@ -26,7 +26,7 @@ in
   config = mkIf cfg.enable {
     services.invokeai = {
       package = mkDefault pkgs.invokeai;
-      dataDir = mkDefault "/Users/${cfg.user}/invokeai";
+      dataDir = mkDefault "/Users/${cfg.user}/Library/Application Support/InvokeAI";
     };
 
     launchd.user.agents.invokeai = {

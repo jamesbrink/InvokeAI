@@ -30,7 +30,8 @@ in
       description = ''
         Directory for writable data (models, outputs, database).
         Default is platform-specific: /var/lib/invokeai on NixOS,
-        ~/invokeai on Darwin.
+        ~/Library/Application Support/InvokeAI on Darwin.
+        The INVOKEAI_ROOT environment variable always takes precedence.
       '';
     };
 

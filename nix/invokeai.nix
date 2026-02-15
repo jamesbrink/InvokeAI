@@ -178,7 +178,13 @@ stdenv.mkDerivation {
       --add-flags "'from invokeai.app.run_app import run_app; run_app()'" \
       --prefix PATH : ${lib.makeBinPath [ git ]} \
       --set PYTHONPATH "$out/lib/invokeai" \
-      --run 'export INVOKEAI_ROOT="''${INVOKEAI_ROOT:-$HOME/invokeai}"'
+      --run 'export INVOKEAI_ROOT="''${INVOKEAI_ROOT:-$(
+        if [ "$(uname)" = "Darwin" ]; then
+          echo "$HOME/Library/Application Support/InvokeAI"
+        else
+          echo "''${XDG_DATA_HOME:-$HOME/.local/share}/invokeai"
+        fi
+      )}"'
 
     runHook postInstall
   '';
