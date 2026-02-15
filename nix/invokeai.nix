@@ -159,6 +159,12 @@ stdenv.mkDerivation {
     mkdir -p $out/lib/invokeai
     cp -r . $out/lib/invokeai/
 
+    # Patch shutil.copy → shutil.copyfile in custom node loader so that
+    # Nix-store read-only permissions are not preserved on the target file.
+    substituteInPlace $out/lib/invokeai/invokeai/app/invocations/load_custom_nodes.py \
+      --replace-fail 'shutil.copy(source_custom_nodes_readme_path, target_custom_nodes_readme_path)' \
+      'shutil.copyfile(source_custom_nodes_readme_path, target_custom_nodes_readme_path)'
+
     # Overlay the pre-built frontend
     mkdir -p $out/lib/invokeai/invokeai/frontend/web/dist
     cp -r ${frontend}/* $out/lib/invokeai/invokeai/frontend/web/dist/
