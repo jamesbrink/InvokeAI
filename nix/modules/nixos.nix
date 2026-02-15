@@ -16,6 +16,9 @@
 let
   cfg = config.services.invokeai;
   inherit (lib) mkDefault mkIf mkMerge;
+
+  # Only use StateDirectory when dataDir is the default /var/lib/invokeai
+  useStateDirectory = cfg.dataDir == "/var/lib/invokeai";
 in
 {
   imports = [ ./common-options.nix ];
@@ -27,17 +30,10 @@ in
         dataDir = mkDefault "/var/lib/invokeai";
       };
 
-      users.users.${cfg.user} = {
-        isSystemUser = true;
-        group = cfg.group;
-        home = cfg.dataDir;
-        description = "InvokeAI service user";
-      };
-      users.groups.${cfg.group} = { };
-
       systemd.services.invokeai = {
         description = "InvokeAI - AI Image Generation";
-        after = [ "network.target" ];
+        after = [ "network.target" ] ++ cfg.requiresMounts;
+        requires = cfg.requiresMounts;
         wantedBy = [ "multi-user.target" ];
 
         environment = {
@@ -58,16 +54,13 @@ in
           User = cfg.user;
           Group = cfg.group;
 
-          StateDirectory = "invokeai";
-          StateDirectoryMode = "0750";
-
           Restart = "on-failure";
           RestartSec = 5;
 
           # Hardening
           ProtectSystem = "strict";
           ReadWritePaths = [ cfg.dataDir ];
-          ProtectHome = true;
+          ProtectHome = if cfg.createUser then true else "read-only";
           PrivateTmp = true;
           NoNewPrivileges = true;
           ProtectKernelTunables = true;
@@ -83,11 +76,25 @@ in
             "render"
           ];
         }
+        // lib.optionalAttrs useStateDirectory {
+          StateDirectory = "invokeai";
+          StateDirectoryMode = "0750";
+        }
         // lib.optionalAttrs (cfg.environmentFile != null) {
           EnvironmentFile = cfg.environmentFile;
         };
       };
     }
+
+    (mkIf cfg.createUser {
+      users.users.${cfg.user} = {
+        isSystemUser = true;
+        group = cfg.group;
+        home = cfg.dataDir;
+        description = "InvokeAI service user";
+      };
+      users.groups.${cfg.group} = { };
+    })
 
     (mkIf cfg.openFirewall {
       networking.firewall.allowedTCPPorts = [ cfg.port ];

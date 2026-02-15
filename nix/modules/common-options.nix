@@ -51,10 +51,28 @@ in
       description = "Group for the service. Only used on NixOS.";
     };
 
+    createUser = mkOption {
+      type = types.bool;
+      default = true;
+      description = ''
+        Whether to create a dedicated system user and group for InvokeAI.
+        Set to false when running as an existing user (e.g. your login user).
+      '';
+    };
+
     openFirewall = mkOption {
       type = types.bool;
       default = false;
       description = "Whether to open the firewall for the web UI port. Only effective on NixOS.";
+    };
+
+    requiresMounts = mkOption {
+      type = types.listOf types.str;
+      default = [ ];
+      description = ''
+        List of systemd mount units that must be available before starting InvokeAI.
+        Example: [ "storage\\x2dfast-AI.mount" ]
+      '';
     };
 
     extraArgs = mkOption {
