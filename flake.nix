@@ -101,6 +101,24 @@
               program = "${invokeai}/bin/invokeai-web";
               meta.description = "Start the InvokeAI web interface";
             };
+            invokeai-web = {
+              type = "app";
+              program = "${invokeai}/bin/invokeai-web";
+              meta.description = "Start the InvokeAI web interface";
+            };
+          }
+          // lib.optionalAttrs isLinux {
+            docker-load = {
+              type = "app";
+              program = toString (
+                pkgs.writeShellScript "invokeai-docker-load" ''
+                  echo "Loading InvokeAI Docker image..."
+                  ${docker-image} | ${pkgs.docker}/bin/docker load
+                  echo "Done. Run with: docker run -p 9090:9090 -v \$PWD/data:/data invokeai"
+                ''
+              );
+              meta.description = "Build and load the InvokeAI Docker image";
+            };
           };
 
           # nix develop — provided by ./nix/devshell.nix

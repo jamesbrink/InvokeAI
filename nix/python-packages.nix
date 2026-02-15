@@ -254,6 +254,109 @@ self: super:
     doCheck = false;
   };
 
+  # mediapipe — pre-built wheels, platform-specific
+  mediapipe =
+    let
+      version = "0.10.14";
+      wheelData = {
+        aarch64-darwin = {
+          url = "https://files.pythonhosted.org/packages/2d/df/be410905b9757de4b00891dd34236d96e6db150b624f28cc27cd90c74564/mediapipe-${version}-cp312-cp312-macosx_11_0_universal2.whl";
+          hash = "sha256-qiKYwYhnFs3mvXzparoVBdZ9Uu2rqFb2wuGrkF3lKw0=";
+        };
+        x86_64-darwin = {
+          url = "https://files.pythonhosted.org/packages/2d/df/be410905b9757de4b00891dd34236d96e6db150b624f28cc27cd90c74564/mediapipe-${version}-cp312-cp312-macosx_11_0_universal2.whl";
+          hash = "sha256-qiKYwYhnFs3mvXzparoVBdZ9Uu2rqFb2wuGrkF3lKw0=";
+        };
+        aarch64-linux = {
+          url = "https://files.pythonhosted.org/packages/f4/da/dfed8db260b3fbe4e24ac17dda32c55787643a656d8d4e78c55bc847efa8/mediapipe-${version}-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl";
+          hash = "sha256-PjDtLzn5JZJN5Yre7GqOYbpr62lZMl3A2KGqSHp0N3s=";
+        };
+        x86_64-linux = {
+          url = "https://files.pythonhosted.org/packages/11/73/07c6dcbb322f86e2b8526e0073456dbdd2813d5351f772f882123c985fda/mediapipe-${version}-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl";
+          hash = "sha256-mx5y11TNnhtLiNgOyerS8cvoQkt/iD072lM0G5gqn4s=";
+        };
+      };
+      platData = wheelData.${pkgs.stdenv.hostPlatform.system};
+
+      # The mediapipe wheel has RECORD entries without hashes (version.txt),
+      # which causes the nixpkgs wheel repacker to fail. Pre-patch the wheel.
+      # Fix wheel RECORD: add hash entries for files missing from or incomplete in RECORD.
+      fixRecordScript = pkgs.writeText "fix-wheel-record.py" ''
+        import zipfile, hashlib, base64, sys
+        src_whl = sys.argv[1]
+        out_whl = sys.argv[2]
+        with zipfile.ZipFile(src_whl, "r") as zin:
+            names = zin.namelist()
+            record_name = [n for n in names if n.endswith("/RECORD")][0]
+            record = zin.read(record_name).decode()
+            # Parse existing RECORD entries
+            recorded_files = set()
+            new_lines = []
+            for line in record.strip().split("\n"):
+                parts = line.strip("\r").split(",")
+                recorded_files.add(parts[0])
+                if len(parts) >= 3 and parts[1] == "" and "RECORD" not in parts[0]:
+                    fname = parts[0]
+                    data = zin.read(fname)
+                    digest = hashlib.sha256(data).digest()
+                    b64 = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
+                    new_lines.append(f"{fname},sha256={b64},{len(data)}")
+                else:
+                    new_lines.append(line.strip("\r"))
+            # Add entries for files in the zip but missing from RECORD
+            for name in names:
+                if name not in recorded_files and not name.endswith("/") and name != record_name:
+                    data = zin.read(name)
+                    digest = hashlib.sha256(data).digest()
+                    b64 = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
+                    new_lines.append(f"{name},sha256={b64},{len(data)}")
+            new_record = "\n".join(new_lines) + "\n"
+            with zipfile.ZipFile(out_whl, "w") as zout:
+                for item in zin.infolist():
+                    if item.filename == record_name:
+                        zout.writestr(item, new_record)
+                    else:
+                        zout.writestr(item, zin.read(item.filename))
+      '';
+      rawWheel = pkgs.fetchurl {
+        inherit (platData) url hash;
+        name = baseNameOf platData.url;
+      };
+      patchedWheel =
+        pkgs.runCommand (baseNameOf platData.url)
+          {
+            nativeBuildInputs = [ pkgs.python312 ];
+          }
+          ''
+            python3 ${fixRecordScript} ${rawWheel} $out
+          '';
+    in
+    self.buildPythonPackage {
+      pname = "mediapipe";
+      inherit version;
+      format = "wheel";
+
+      src = patchedWheel;
+
+      nativeBuildInputs = [ self.pythonRelaxDepsHook ];
+      pythonRelaxDeps = true;
+      pythonRemoveDeps = [ "opencv-contrib-python" ];
+
+      dependencies = with self; [
+        absl-py
+        attrs
+        flatbuffers
+        matplotlib
+        numpy
+        opencv4
+        protobuf
+        sounddevice
+      ];
+
+      doCheck = false;
+      pythonImportsCheck = [ "mediapipe" ];
+    };
+
   # === Version-pinned overrides ===
 
   # InvokeAI requires diffusers 0.36.0

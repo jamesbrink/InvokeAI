@@ -24,6 +24,7 @@ let
       compel
       diffusers
       gguf
+      mediapipe
       numpy
       onnx
       onnxruntime
@@ -166,11 +167,12 @@ stdenv.mkDerivation {
 
     # Main entry point wrapper
     makeWrapper ${pythonEnv}/bin/python $out/bin/invokeai-web \
-      --add-flags "-m" \
-      --add-flags "invokeai.app.run_app" \
+      --add-flags "-P" \
+      --add-flags "-c" \
+      --add-flags "'from invokeai.app.run_app import run_app; run_app()'" \
       --prefix PATH : ${lib.makeBinPath [ git ]} \
       --set PYTHONPATH "$out/lib/invokeai" \
-      --set-default INVOKEAI_ROOT "$HOME/invokeai"
+      --run 'export INVOKEAI_ROOT="''${INVOKEAI_ROOT:-$HOME/invokeai}"'
 
     runHook postInstall
   '';
