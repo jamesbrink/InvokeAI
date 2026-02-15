@@ -338,7 +338,16 @@ self: super:
 
       src = patchedWheel;
 
-      nativeBuildInputs = [ self.pythonRelaxDepsHook ];
+      nativeBuildInputs = [
+        self.pythonRelaxDepsHook
+      ] ++ lib.optionals pkgs.stdenv.isLinux [
+        pkgs.autoPatchelfHook
+      ];
+
+      buildInputs = lib.optionals pkgs.stdenv.isLinux [
+        pkgs.stdenv.cc.cc.lib  # libstdc++.so.6
+      ];
+
       pythonRelaxDeps = true;
       pythonRemoveDeps = [ "opencv-contrib-python" ];
 
