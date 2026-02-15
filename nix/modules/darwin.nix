@@ -44,9 +44,10 @@ in
 
         ${envLines}
 
+        export INVOKEAI_HOST="${cfg.host}"
+        export INVOKEAI_PORT="${toString cfg.port}"
+
         exec ${cfg.package}/bin/invokeai-web \
-          --host ${cfg.host} \
-          --port ${toString cfg.port} \
           ${lib.concatStringsSep " " cfg.extraArgs}
       '';
 

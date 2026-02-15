@@ -42,6 +42,8 @@ in
 
         environment = {
           INVOKEAI_ROOT = cfg.dataDir;
+          INVOKEAI_HOST = cfg.host;
+          INVOKEAI_PORT = toString cfg.port;
         }
         // cfg.environment;
 
@@ -50,10 +52,6 @@ in
           ExecStart = lib.concatStringsSep " " (
             [
               "${cfg.package}/bin/invokeai-web"
-              "--host"
-              cfg.host
-              "--port"
-              (toString cfg.port)
             ]
             ++ cfg.extraArgs
           );

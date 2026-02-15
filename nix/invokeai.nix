@@ -184,7 +184,8 @@ stdenv.mkDerivation {
         else
           echo "''${XDG_DATA_HOME:-$HOME/.local/share}/invokeai"
         fi
-      )}"'
+      )}"' \
+      --run 'if [ "$(uname)" = "Darwin" ]; then export PYTORCH_ENABLE_MPS_FALLBACK="''${PYTORCH_ENABLE_MPS_FALLBACK:-1}"; fi'
 
     runHook postInstall
   '';
