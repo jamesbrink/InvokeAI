@@ -40,6 +40,7 @@ in
           INVOKEAI_ROOT = cfg.dataDir;
           INVOKEAI_HOST = cfg.host;
           INVOKEAI_PORT = toString cfg.port;
+          HF_HOME = "${cfg.dataDir}/.cache/huggingface";
         }
         // cfg.environment;
 
