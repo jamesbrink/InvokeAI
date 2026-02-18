@@ -41,6 +41,7 @@ in
           INVOKEAI_HOST = cfg.host;
           INVOKEAI_PORT = toString cfg.port;
           HF_HOME = "${cfg.dataDir}/.cache/huggingface";
+          MPLCONFIGDIR = "${cfg.dataDir}/.cache/matplotlib";
         }
         // cfg.environment;
 
